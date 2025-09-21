@@ -47,9 +47,11 @@ namespace Consumer.Api.HostedServices
                 {
                     Console.WriteLine(ex.Message);
 
-                    int retryCount = 0;
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
 
-                    if (ea.BasicProperties.Headers != null && ea.BasicProperties.Headers.TryGetValue("retry-count", out var value))
+                    //int retryCount = 0;
+
+                    /*if (ea.BasicProperties.Headers != null && ea.BasicProperties.Headers.TryGetValue("retry-count", out var value))
                         retryCount = Convert.ToInt32(value);
 
                     if (retryCount <= int.Parse(_configuration["RETRY_COUNT"]!))
@@ -72,8 +74,7 @@ namespace Consumer.Api.HostedServices
                             routingKey: _configuration["RABBITMQ_DEADLETTER"]!,
                             body: ea.Body
                         );
-                    }
-                        
+                    }*/
                 }
             };
 
