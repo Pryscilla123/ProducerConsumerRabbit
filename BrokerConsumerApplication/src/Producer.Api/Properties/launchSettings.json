@@ -48,7 +48,10 @@
             "RABBITMQ_PORT": "5672",
             "RABBITMQ_USER": "guest",
             "RABBITMQ_PASSWORD": "guest",
-            "RABBITMQ_QUEUE": "queue.armazem.criado.v1"
+            "RABBITMQ_QUEUE": "queue.armazem.criado.v1",
+            "RABBITMQ_DELAYED": "queue.armazem.criado.delayed.v1",
+            "RABBITMQ_DEADLETTER": "queue.armazem.criado.deadletter.v1",
+            "RETRY_COUNT": "5"
         }
     }
   }

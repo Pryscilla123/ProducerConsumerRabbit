@@ -39,17 +39,46 @@ namespace Consumer.Api.HostedServices
                 try
                 {
                     await _armazemRepository.CriarArmazem(armazem!);
+                    await _channel.BasicAckAsync(ea.DeliveryTag, false);
+
+                    Console.WriteLine($"Armazem {armazem!.Nome} cadastrado!");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
-                }
 
-                Console.WriteLine($"Armazem {armazem!.Nome} cadastrado!");
+                    int retryCount = 0;
+
+                    if (ea.BasicProperties.Headers != null && ea.BasicProperties.Headers.TryGetValue("retry-count", out var value))
+                        retryCount = Convert.ToInt32(value);
+
+                    if (retryCount <= int.Parse(_configuration["RETRY_COUNT"]!))
+                    {
+                        ea.BasicProperties.Headers!["retry-count"] = ++retryCount;
+
+                        // Posso ou não posso passar minha basic Properties
+                        // Nada faz sentidooo
+                        await _channel.BasicPublishAsync(
+                            exchange: string.Empty,
+                            routingKey: _configuration["RABBITMQ_DELAYED"]!,
+                            basicProperties: ea.BasicProperties,
+                            body: ea.Body
+                        );
+                    }
+                    else
+                    {
+                        await _channel.BasicPublishAsync(
+                            exchange: string.Empty,
+                            routingKey: _configuration["RABBITMQ_DEADLETTER"]!,
+                            body: ea.Body
+                        );
+                    }
+                        
+                }
             };
 
             await _channel.BasicConsumeAsync(queue: _configuration["RABBITMQ_QUEUE"]!,
-                                     autoAck: true,
+                                     autoAck: false,
                                      consumer: consumer);
 
             await Task.CompletedTask;
@@ -67,11 +96,42 @@ namespace Consumer.Api.HostedServices
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            await _channel.QueueDeclareAsync(queue: _configuration["RABBITMQ_QUEUE"]!,
+            // declarando minha deadletter
+            await _channel.QueueDeclareAsync(queue: _configuration["RABBITMQ_DEADLETTER"]!,
                                  durable: true,
                                  exclusive: false,
                                  autoDelete: false,
                                  arguments: null);
+
+            // config da deadletter da fila principal
+            var mainArgs = new Dictionary<string, object>
+            {
+                {"x-dead-letter-exchange", "" },
+                { "x-dead-letter-routing-key", _configuration["RABBITMQ_DELAYED"]! }
+            };
+
+            // config da delayed da fila principal
+            var delayedArgs = new Dictionary<string, object>
+            {
+                {"x-dead-letter-exchange", "" },
+                { "x-dead-letter-routing-key", _configuration["RABBITMQ_QUEUE"]! },
+                { "x-message-ttl", 600000 }
+            };
+
+            // declarando minha delayed
+            await _channel.QueueDeclareAsync(queue: _configuration["RABBITMQ_DELAYED"]!,
+                                 durable: true,
+                                 exclusive: false,
+                                 autoDelete: false,
+                                 arguments: delayedArgs!);
+
+            // config da fila
+
+            await _channel.QueueDeclareAsync(queue: _configuration["RABBITMQ_QUEUE"]!,
+                                 durable: true,
+                                 exclusive: false,
+                                 autoDelete: false,
+                                 arguments: mainArgs!);
         }
 
         public override void Dispose()
