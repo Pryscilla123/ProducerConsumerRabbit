@@ -56,7 +56,9 @@ namespace Producer.Api.Controllers
             {
                 return BadRequest(ModelState);
             }
+
             var result = await _signInManager.PasswordSignInAsync(loginUserViewModel.Email, loginUserViewModel.Password, isPersistent: false, lockoutOnFailure: true);
+
             if (result.Succeeded)
             {
                 return Ok("Usuário logado com sucesso!");
